@@ -62,13 +62,39 @@ st.markdown(
 )
 st.markdown("""
 <style>
-.stSelectbox > div > div, .stDateInput > div > div, .stTextInput > div > div > input, .stTextArea > div > textarea {
-    background-color: #f0f8ff !important; border-radius: 8px !important;
+
+/* input box background */
+.stSelectbox > div > div,
+.stDateInput > div > div 
+.stTextInput > div > div > input,
+.stTextArea > div > textarea {
+    background-color: #f0f8ff !important;
+    border-radius: 8px !important;
+    color: #1f2d3d !important;   /* สีตัวหนังสือ */
 }
-div.stButton > button, .stForm [data-testid=stFormSubmitButton] button {
-    background-color: #27ae60; color: white; font-weight: bold; border-radius: 25px;
-    padding: 10px 40px; font-size: 18px;
+
+/* selectbox text (ค่าที่เลือกแล้ว) */
+div[data-baseweb="select"] span {
+    color: #1f2d3d !important;
+    font-weight: 500;
 }
+
+/* dropdown option */
+div[data-baseweb="popover"] {
+    color: #1f2d3d !important;
+}
+
+/* button */
+div.stButton > button,
+.stForm [data-testid=stFormSubmitButton] button {
+    background-color: #27ae60;
+    color: white;
+    font-weight: bold;
+    border-radius: 25px;
+    padding: 10px 40px;
+    font-size: 18px;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
