@@ -9,5 +9,3 @@ matplotlib
 plotly
 xlsxwriter
 openpyxl
-requests
-collections
