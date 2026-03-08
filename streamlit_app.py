@@ -7,7 +7,8 @@ import os
 from roboflow import Roboflow
 import pandas as pd
 import io
-
+import requests
+from collections import defaultdict
 
 LOCATION_DATA = {
     "SB": {"บรรจุ": ["ห้องแต่งตัว", "ห้องบรรจุ 1", "ห้องบรรจุ 2", "ห้องบรรจุ 3", "ห้องบรรจุ Auto", "ห้อง Mix SP", "ห้องบรรจุ SP", "ห้องเก็บภาชนะ ชั้น 1", "ห้องเก็บภาชนะ ชั้น 2", "ห้อง Pack SP"]},
@@ -41,7 +42,7 @@ def load_insect_model():
         API_KEY = "3ZQFofNJkviVJdyAb4mG"
         rf = Roboflow(api_key=API_KEY)
         project = rf.workspace("aiinsect").project("ai-insect")
-        model = project.version(3).model
+        model = project.version(4).model
         return model
     except Exception as e:
         st.error(f"❌ ไม่สามารถเชื่อมต่อ AI ได้: {e}")
@@ -107,60 +108,130 @@ with col_left:
         else:
             uploaded_image = st.camera_input("ถ่ายภาพ", label_visibility="collapsed")
         
+        if "confidence_threshold" not in st.session_state:
+            st.session_state.confidence_threshold = 0.4
+
         analysis_button = st.form_submit_button("Analysis", use_container_width=True)
 
-if analysis_button:
-    st.session_state.analysis_results = None
-    st.session_state.excel_data_to_download = None
-    
-    if not all([st.session_state.factory, st.session_state.department, st.session_state.location]):
-        st.warning("⚠️ กรุณากรอกข้อมูล โรงงาน, หน่วยงาน, และพื้นที่ติดตั้งให้ครบถ้วน")
-    elif uploaded_image is None:
-        st.warning("⚠️ กรุณาอัปโหลดหรือถ่ายภาพก่อน")
-    elif not model:
-        st.error("❌ โมเดล AI ยังไม่พร้อมใช้งาน")
-    else:
-        try:
-            with st.spinner("🧠 กำลังวิเคราะห์ภาพ..."):
-                image_pil = Image.open(uploaded_image).convert("RGB")
-                temp_path = "temp_insect_image.jpg"
-                image_pil.save(temp_path)
-                
-                results_json = model.predict(temp_path, confidence=40, overlap=30).json()
-                os.remove(temp_path) 
-                
-                predictions = results_json.get('predictions', [])
-                
-                image_cv2 = cv2.cvtColor(np.array(image_pil), cv2.COLOR_RGB2BGR)
-                for pred in predictions:
-                    x, y, w, h = int(pred['x']), int(pred['y']), int(pred['width']), int(pred['height'])
-                    x1, y1, x2, y2 = x - w // 2, y - h // 2, x + w // 2, y + h // 2
-                    cv2.rectangle(image_cv2, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                    label = f"{pred['class']} ({pred['confidence']:.2f})"
-                    (lw, lh), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)
-                    cv2.rectangle(image_cv2, (x1, y1 - lh - 10), (x1 + lw, y1), (0, 255, 0), -1)
-                    cv2.putText(image_cv2, label, (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
+    if analysis_button:
+        st.session_state.analysis_results = None
+        st.session_state.excel_data_to_download = None
+        
+        if not all([st.session_state.factory, st.session_state.department, st.session_state.location]):
+            st.warning("⚠️ กรุณากรอกข้อมูล โรงงาน, หน่วยงาน, และพื้นที่ติดตั้งให้ครบถ้วน")
+        elif uploaded_image is None:
+            st.warning("⚠️ กรุณาอัปโหลดหรือถ่ายภาพก่อน")
+        elif not model:
+            st.error("❌ โมเดล AI ยังไม่พร้อมใช้งาน")
+        else:
+            try:
+                with st.spinner("🧠 กำลังวิเคราะห์ภาพ..."):
+                    image_pil = Image.open(uploaded_image).convert("RGB")
+                    temp_path = "temp_insect_image.jpg"
+                    image_pil.save(temp_path)
+                    
+                    # RUN MODEL (ครั้งเดียว)
+                    results_json = model.predict(temp_path, confidence=40, overlap=30).json()
+                    os.remove(temp_path) 
+                    predictions = results_json.get('predictions', [])
 
-                annotated_image_rgb = cv2.cvtColor(image_cv2, cv2.COLOR_BGR2RGB)
+                    # เก็บข้อมูลดิบ
+                    st.session_state.raw_predictions = predictions
+                    st.session_state.original_image = image_pil
+            
+                st.success("✅ วิเคราะห์สำเร็จ!")
+            except Exception as e:
+                st.error("😭 เกิดข้อผิดพลาดร้ายแรง!")
+                st.exception(e)
 
-                st.session_state.analysis_results = {
-                    "total_insects": len(predictions),
-                    "annotated_image": annotated_image_rgb,
-                }
-            st.success("✅ วิเคราะห์สำเร็จ!")
-        except Exception as e:
-            st.error("😭 เกิดข้อผิดพลาดร้ายแรง!")
-            st.exception(e)
+
 
 with col_right:
     st.subheader("ผลการวิเคราะห์")
     results = st.session_state.get('analysis_results')
 
-    if results:
-        st.metric("จำนวนแมลงทั้งหมด (Total Insects)", f"{results.get('total_insects', 0)} ตัว")
+    if "raw_predictions" in st.session_state:
+
+        predictions = st.session_state.raw_predictions
+        image_pil = st.session_state.original_image
+
+        confidence_threshold = st.slider(
+            "🎯 Confidence (ค่าความเชื่อมั่น)",
+            0.0,
+            1.0,
+            value=st.session_state.confidence_threshold,
+            step=0.05
+        )
+
+        st.session_state.confidence_threshold = confidence_threshold
+
+        # FILTER
+        filtered_predictions = [
+            p for p in predictions
+            if p["confidence"] >= confidence_threshold
+        ]
+
+        insect_count = defaultdict(int)
+
+        image_cv2 = cv2.cvtColor(np.array(image_pil), cv2.COLOR_RGB2BGR)
+
+        class_colors = {
+            "fly": (0,255,0),
+            "test": (255,0,0)
+        }
+
+        for pred in filtered_predictions:
+
+            insect_class = pred["class"]
+            insect_count[insect_class] += 1
+
+            x = int(pred["x"])
+            y = int(pred["y"])
+            w = int(pred["width"])
+            h = int(pred["height"])
+
+            x1 = x - w//2
+            y1 = y - h//2
+            x2 = x + w//2
+            y2 = y + h//2
+
+            color = class_colors.get(insect_class,(0,255,0))
+
+            cv2.rectangle(image_cv2,(x1,y1),(x2,y2),color,2)
+
+            label = f"{insect_class} ({pred['confidence']:.2f})"
+
+            cv2.putText(
+                image_cv2,
+                label,
+                (x1,y1-5),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                color,
+                2
+            )
+
+        annotated_image_rgb = cv2.cvtColor(image_cv2, cv2.COLOR_BGR2RGB)
+
+        # COUNT
+        fly_count = insect_count.get("fly",0)
+        other_count = insect_count.get("test",0)
+        total = fly_count + other_count
+
+        m1,m2,m3 = st.columns(3)
+
+        with m1:
+            st.metric("จำนวนแมลงทั้งหมด", f"{total} ตัว")
+
+        with m2:
+            st.metric("แมลงวัน (Fly)", f"{fly_count} ตัว")
+
+        with m3:
+            st.metric("แมลงอื่น", f"{other_count} ตัว")
+        
         st.markdown("---")
         st.markdown("#### รูปภาพที่ Label แล้ว (Picture Label)")
-        st.image(results.get("annotated_image"), use_container_width=True)
+        st.image(annotated_image_rgb, use_container_width=True)
 
         st.markdown("---")
         st.subheader("📝 บันทึกและดาวน์โหลดผล")
@@ -184,11 +255,19 @@ with col_right:
                             "โรงงาน": st.session_state.factory,
                             "หน่วยงาน/แผนก": st.session_state.department,
                             "พื้นที่ติดตั้ง": st.session_state.location,
-                            "จำนวนแมลงทั้งหมด": results.get("total_insects", 0),
+                            "จำนวนแมลงทั้งหมด": total,
+                            "จำนวนแมลงวัน": fly_count,
+                            "จำนวนแมลงอื่นๆ": other_count,
                             "ผู้บันทึก": recorder_name,
                             "หมายเหตุ": notes
                         }
+
+                        urlPost = "https://default097b580bb474487c888346e0bb1b5c.11.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/49eae18339ec46cd97ca8069832d0f34/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=Ei6KSW6Dt9UVgb5ZYNxh6PLtkX7dxQuOF5LAsdgVFnw"
+                        response = requests.post(urlPost,json=new_record_data)
+                        print(response.status_code)
+                       
                         df_new = pd.DataFrame([new_record_data])
+                        ##df_new.to_excel(EXCEL_FILENAME,index=False)
 
                         if os.path.exists(EXCEL_FILENAME):
                             df_existing = pd.read_excel(EXCEL_FILENAME, engine='openpyxl')
@@ -196,10 +275,10 @@ with col_right:
                         else:
                             df_combined = df_new
                         
+
                         df_combined.to_excel(EXCEL_FILENAME, index=False)
                         st.success("✅ บันทึกข้อมูลลงไฟล์หลักเรียบร้อยแล้ว!")
 
-                      
                         output = io.BytesIO()
                         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
                             df_combined.to_excel(writer, index=False, sheet_name='AnalysisHistory')

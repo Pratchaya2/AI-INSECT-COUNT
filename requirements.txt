@@ -1,5 +1,6 @@
 streamlit
 roboflow
+datetime
 opencv-python-headless
 Pillow
 numpy
@@ -8,3 +9,5 @@ matplotlib
 plotly
 xlsxwriter
 openpyxl
+requests
+collections
