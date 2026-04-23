@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 2
+names: ['fly', 'test']
+
+roboflow:
+  workspace: aiinsect
+  project: aiinsect
+  version: dataset
+  license: Private
+  url: https://app.roboflow.com/aiinsect/aiinsect/dataset

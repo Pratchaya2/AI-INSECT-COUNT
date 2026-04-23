@@ -9,6 +9,8 @@ import pandas as pd
 import io
 import requests
 from collections import defaultdict
+import base64
+from ultralytics import YOLO
 
 LOCATION_DATA = {
     "SB": {"บรรจุ": ["ห้องแต่งตัว", "ห้องบรรจุ 1", "ห้องบรรจุ 2", "ห้องบรรจุ 3", "ห้องบรรจุ Auto", "ห้อง Mix SP", "ห้องบรรจุ SP", "ห้องเก็บภาชนะ ชั้น 1", "ห้องเก็บภาชนะ ชั้น 2", "ห้อง Pack SP"]},
@@ -39,10 +41,12 @@ EXCEL_FILENAME = "insect_analysis_history.xlsx"
 def load_insect_model():
     """โหลดโมเดลตรวจจับแมลงจาก Roboflow"""
     try:
-        API_KEY = "3ZQFofNJkviVJdyAb4mG"
-        rf = Roboflow(api_key=API_KEY)
-        project = rf.workspace("aiinsect").project("ai-insect")
-        model = project.version(4).model
+        #API_KEY = "3ZQFofNJkviVJdyAb4mG"
+        #rf = Roboflow(api_key=API_KEY)
+        #project = rf.workspace("aiinsect").project("ai-insect")
+        #model = project.version(4).model
+        #return model
+        model = YOLO("runs_detect_train-4_weights_best.pt")
         return model
     except Exception as e:
         st.error(f"❌ ไม่สามารถเชื่อมต่อ AI ได้: {e}")
@@ -118,7 +122,7 @@ with col_left:
 
     def on_department_change(): st.session_state.location = ""
     department_list = [""] + sorted(LOCATION_DATA[st.session_state.factory].keys()) if st.session_state.factory else [""]
-    st.selectbox("หน่วยงาน/แผนก", department_list, key='department', on_change=on_department_change, disabled=not st.session_state.factory)
+    st.selectbox("เลือกหน่วยงาน/แผนก", department_list, key='department', on_change=on_department_change, disabled=not st.session_state.factory)
 
     location_list = [""] + sorted(LOCATION_DATA[st.session_state.factory][st.session_state.department]) if st.session_state.factory and st.session_state.department else [""]
     st.selectbox("พื้นที่ติดตั้ง", location_list, key='location', disabled=not st.session_state.department)
@@ -157,14 +161,30 @@ with col_left:
                     image_pil.save(temp_path)
                     
                     # RUN MODEL (ครั้งเดียว)
-                    results_json = model.predict(temp_path, confidence=40, overlap=30).json()
-                    os.remove(temp_path) 
-                    predictions = results_json.get('predictions', [])
+                    results = model.predict(source=temp_path,conf=0.10,iou=0.40,imgsz=1920,max_det=5000)
 
-                    # เก็บข้อมูลดิบ
+                    os.remove(temp_path) 
+
+                    predictions = []
+
+                    for r in results:
+                        for box in r.boxes:
+                            x1, y1, x2, y2 = box.xyxy[0].tolist()
+                            conf = float(box.conf[0])
+                            cls = int(box.cls[0])
+
+                            predictions.append({
+                                "x": (x1+x2)/2,
+                                "y": (y1+y2)/2,
+                                "width": x2-x1,
+                                "height": y2-y1,
+                                "confidence": conf,
+                                "class": model.names[cls]
+                            })
+
                     st.session_state.raw_predictions = predictions
                     st.session_state.original_image = image_pil
-            
+
                 st.success("✅ วิเคราะห์สำเร็จ!")
             except Exception as e:
                 st.error("😭 เกิดข้อผิดพลาดร้ายแรง!")
@@ -275,6 +295,13 @@ with col_right:
                         bkk_timezone = timezone(timedelta(hours=7))
                         time_in_bkk = datetime.now(bkk_timezone)
                         
+                        img = Image.fromarray(annotated_image_rgb)
+                        buffer = io.BytesIO()
+                        img.save(buffer, format="JPEG")
+                        img_bytes = buffer.getvalue()
+                        # แปลงเป็น Base64
+                        img_base64 = base64.b64encode(img_bytes).decode("utf-8")
+
                         new_record_data = {
                             "วันที่ตรวจ": st.session_state.inspection_date.strftime("%Y-%m-%d"),
                             "เวลาที่บันทึก": time_in_bkk.strftime("%H:%M:%S"),
@@ -285,8 +312,11 @@ with col_right:
                             "จำนวนแมลงวัน": fly_count,
                             "จำนวนแมลงอื่นๆ": other_count,
                             "ผู้บันทึก": recorder_name,
-                            "หมายเหตุ": notes
+                            "หมายเหตุ": notes,
+                            "รูปภาพ": img_base64
                         }
+
+
 
                         urlPost = "https://default097b580bb474487c888346e0bb1b5c.11.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/49eae18339ec46cd97ca8069832d0f34/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=Ei6KSW6Dt9UVgb5ZYNxh6PLtkX7dxQuOF5LAsdgVFnw"
                         response = requests.post(urlPost,json=new_record_data)
