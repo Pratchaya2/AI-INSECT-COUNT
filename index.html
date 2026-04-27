@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Water & Wastewater Monitoring — โรงงานน้ำตาล</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+  :root {
+    --blue-900: #0a2e52;
+    --blue-800: #0d3d6e;
+    --blue-700: #1155a0;
+    --blue-500: #2980d4;
+    --blue-400: #4fa3e8;
+    --blue-200: #b8daf5;
+    --blue-100: #dceef9;
+    --blue-50:  #f0f8ff;
+    --teal-500: #0f9e75;
+    --teal-100: #cdf0e3;
+    --amber-500:#c07c10;
+    --amber-100:#fdecc8;
+    --red-500:  #d63b3b;
+    --red-100:  #fde8e8;
+    --gray-900: #1a1f2e;
+    --gray-700: #3a4255;
+    --gray-500: #6b748a;
+    --gray-300: #c4cad8;
+    --gray-100: #f2f4f8;
+    --gray-50:  #f8f9fc;
+    --white:    #ffffff;
+    --sidebar-w: 220px;
+    --topbar-h:  56px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'IBM Plex Sans Thai', sans-serif;
+    background: var(--gray-50);
+    color: var(--gray-900);
+    min-height: 100vh;
+    display: flex;
+  }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    width: var(--sidebar-w);
+    background: var(--blue-900);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    z-index: 100;
+  }
+
+  .sidebar-logo {
+    padding: 20px 20px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+  .sidebar-logo .logo-mark {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .logo-icon {
+    width: 36px; height: 36px;
+    background: var(--blue-500);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .logo-icon svg { width: 20px; height: 20px; stroke: #fff; fill: none; stroke-width: 2; }
+  .logo-text { color: #fff; font-size: 13px; font-weight: 600; line-height: 1.3; }
+  .logo-text span { color: var(--blue-400); display: block; font-size: 10px; font-weight: 400; letter-spacing: 0.5px; }
+
+  .sidebar-nav { flex: 1; padding: 12px 0; }
+  .nav-section { padding: 14px 16px 6px; font-size: 9px; font-weight: 600; color: rgba(255,255,255,0.3); letter-spacing: 1.2px; text-transform: uppercase; }
+
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 16px;
+    color: rgba(255,255,255,0.6);
+    font-size: 13px;
+    cursor: pointer;
+    border-radius: 6px;
+    margin: 1px 8px;
+    transition: all 0.15s;
+  }
+  .nav-item:hover { background: rgba(255,255,255,0.07); color: #fff; }
+  .nav-item.active { background: var(--blue-700); color: #fff; }
+  .nav-item svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; flex-shrink: 0; }
+  .nav-badge { margin-left: auto; background: var(--red-500); color: #fff; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 10px; }
+
+  .sidebar-footer {
+    padding: 14px 16px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+  }
+  .user-row { display: flex; align-items: center; gap: 10px; }
+  .user-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--blue-700); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: var(--blue-200); flex-shrink: 0; }
+  .user-info { min-width: 0; }
+  .user-name { font-size: 12px; font-weight: 500; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .user-role { font-size: 10px; color: rgba(255,255,255,0.4); }
+
+  /* ── Main ── */
+  .main {
+    margin-left: var(--sidebar-w);
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+
+  .topbar {
+    height: var(--topbar-h);
+    background: var(--white);
+    border-bottom: 1px solid var(--gray-300);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 28px;
+    position: sticky; top: 0; z-index: 50;
+  }
+  .topbar-left { display: flex; flex-direction: column; }
+  .topbar-title { font-size: 15px; font-weight: 600; color: var(--gray-900); }
+  .topbar-sub { font-size: 11px; color: var(--gray-500); }
+  .topbar-right { display: flex; align-items: center; gap: 12px; }
+
+  .date-badge {
+    display: flex; align-items: center; gap: 6px;
+    background: var(--gray-100);
+    border: 1px solid var(--gray-300);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 12px; color: var(--gray-700);
+  }
+  .date-badge svg { width: 14px; height: 14px; stroke: var(--gray-500); fill: none; stroke-width: 2; }
+
+  .btn-add {
+    display: flex; align-items: center; gap: 6px;
+    background: var(--blue-700);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 13px; font-weight: 500;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .btn-add:hover { background: var(--blue-500); }
+  .btn-add svg { width: 14px; height: 14px; stroke: #fff; fill: none; stroke-width: 2.5; }
+
+  .content { padding: 24px 28px; flex: 1; }
+
+  /* ── KPI Cards ── */
+  .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+
+  .kpi-card {
+    background: var(--white);
+    border: 1px solid var(--gray-300);
+    border-radius: 12px;
+    padding: 18px 20px;
+    position: relative;
+    overflow: hidden;
+  }
+  .kpi-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 3px;
+  }
+  .kpi-blue::before { background: var(--blue-500); }
+  .kpi-teal::before { background: var(--teal-500); }
+  .kpi-amber::before { background: var(--amber-500); }
+  .kpi-red::before { background: var(--red-500); }
+
+  .kpi-label { font-size: 11px; color: var(--gray-500); font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+  .kpi-value { font-size: 26px; font-weight: 600; color: var(--gray-900); line-height: 1; font-family: 'IBM Plex Mono', monospace; }
+  .kpi-unit { font-size: 12px; color: var(--gray-500); margin-left: 4px; font-family: 'IBM Plex Sans Thai', sans-serif; }
+  .kpi-delta { font-size: 11px; margin-top: 6px; display: flex; align-items: center; gap: 4px; }
+  .delta-up { color: var(--teal-500); }
+  .delta-down { color: var(--red-500); }
+  .delta-neutral { color: var(--gray-500); }
+  .kpi-icon { position: absolute; right: 16px; top: 16px; width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+  .ki-blue { background: var(--blue-100); }
+  .ki-teal { background: var(--teal-100); }
+  .ki-amber { background: var(--amber-100); }
+  .ki-red { background: var(--red-100); }
+  .kpi-icon svg { width: 18px; height: 18px; fill: none; stroke-width: 2; }
+  .ki-blue svg { stroke: var(--blue-700); }
+  .ki-teal svg { stroke: var(--teal-500); }
+  .ki-amber svg { stroke: var(--amber-500); }
+  .ki-red svg { stroke: var(--red-500); }
+
+  /* ── Charts row ── */
+  .charts-row { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 24px; }
+
+  .chart-card {
+    background: var(--white);
+    border: 1px solid var(--gray-300);
+    border-radius: 12px;
+    padding: 20px 24px;
+  }
+  .chart-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 16px; }
+  .chart-title { font-size: 14px; font-weight: 600; color: var(--gray-900); }
+  .chart-sub { font-size: 11px; color: var(--gray-500); margin-top: 2px; }
+  .chart-legend { display: flex; gap: 16px; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--gray-500); }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .chart-wrap { position: relative; height: 200px; }
+
+  .standard-card {
+    background: var(--white);
+    border: 1px solid var(--gray-300);
+    border-radius: 12px;
+    padding: 20px 24px;
+  }
+  .param-list { display: flex; flex-direction: column; gap: 14px; margin-top: 4px; }
+  .param-item {}
+  .param-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .param-name { font-size: 12px; font-weight: 500; color: var(--gray-700); }
+  .param-status { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 10px; }
+  .status-ok { background: var(--teal-100); color: #085041; }
+  .status-warn { background: var(--amber-100); color: #633806; }
+  .status-fail { background: var(--red-100); color: #7a1e1e; }
+  .param-bar-bg { height: 6px; background: var(--gray-100); border-radius: 3px; overflow: hidden; }
+  .param-bar { height: 100%; border-radius: 3px; }
+  .bar-ok { background: var(--teal-500); }
+  .bar-warn { background: var(--amber-500); }
+  .bar-fail { background: var(--red-500); }
+  .param-vals { display: flex; justify-content: space-between; margin-top: 4px; }
+  .param-actual { font-size: 11px; font-weight: 500; color: var(--gray-900); font-family: 'IBM Plex Mono', monospace; }
+  .param-limit { font-size: 10px; color: var(--gray-500); }
+
+  /* ── Bottom row ── */
+  .bottom-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+  .table-card {
+    background: var(--white);
+    border: 1px solid var(--gray-300);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .table-header {
+    padding: 16px 20px 12px;
+    border-bottom: 1px solid var(--gray-100);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .table-title { font-size: 14px; font-weight: 600; color: var(--gray-900); }
+  .btn-link { font-size: 12px; color: var(--blue-700); background: none; border: none; cursor: pointer; font-family: inherit; }
+  .btn-link:hover { text-decoration: underline; }
+
+  table { width: 100%; border-collapse: collapse; }
+  thead th { background: var(--gray-50); padding: 8px 16px; font-size: 11px; font-weight: 600; color: var(--gray-500); text-align: left; letter-spacing: 0.3px; text-transform: uppercase; }
+  tbody td { padding: 10px 16px; font-size: 12px; color: var(--gray-700); border-top: 1px solid var(--gray-100); }
+  tbody tr:hover td { background: var(--blue-50); }
+  .mono { font-family: 'IBM Plex Mono', monospace; }
+
+  .alert-row { display: flex; flex-direction: column; gap: 0; }
+  .alert-item {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 12px 20px;
+    border-top: 1px solid var(--gray-100);
+  }
+  .alert-item:first-child { border-top: none; }
+  .alert-dot-wrap { padding-top: 3px; }
+  .alert-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .ad-red { background: var(--red-500); }
+  .ad-amber { background: var(--amber-500); }
+  .alert-content { flex: 1; min-width: 0; }
+  .alert-title { font-size: 12px; font-weight: 500; color: var(--gray-900); }
+  .alert-meta { font-size: 11px; color: var(--gray-500); margin-top: 2px; }
+  .alert-badge { flex-shrink: 0; font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 10px; }
+  .ab-red { background: var(--red-100); color: #7a1e1e; }
+  .ab-amber { background: var(--amber-100); color: #633806; }
+  .ab-ok { background: var(--teal-100); color: #085041; }
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark">
+      <div class="logo-icon">
+        <svg viewBox="0 0 24 24"><path d="M12 2C6 8 4 11 4 14a8 8 0 0016 0c0-3-2-6-8-12z"/></svg>
+      </div>
+      <div class="logo-text">
+        Water Monitor
+        <span>โรงงานน้ำตาล MSB</span>
+      </div>
+    </div>
+  </div>
+
+  <nav class="sidebar-nav">
+    <div class="nav-section">หลัก</div>
+    <div class="nav-item active">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Dashboard
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5"/><path d="M11 13l9-9M15 3h6v6"/></svg>
+      บันทึกข้อมูล
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24"><path d="M12 2C6 8 4 11 4 14a8 8 0 0016 0c0-3-2-6-8-12z"/></svg>
+      Process Water
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M8 12h8M12 8v8"/></svg>
+      บ่อบำบัด
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+      Effluent
+    </div>
+
+    <div class="nav-section" style="margin-top:8px;">รายงาน</div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+      รายงานรายเดือน
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      แนวโน้ม
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+      เปรียบเทียบ
+    </div>
+
+    <div class="nav-section" style="margin-top:8px;">ระบบ</div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 010 14.14M4.93 4.93a10 10 0 000 14.14"/></svg>
+      การแจ้งเตือน
+      <span class="nav-badge">3</span>
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+      ตั้งค่า
+    </div>
+  </nav>
+
+  <div class="sidebar-footer">
+    <div class="user-row">
+      <div class="user-avatar">WE</div>
+      <div class="user-info">
+        <div class="user-name">วิศวกรสิ่งแวดล้อม</div>
+        <div class="user-role">แผนกวิศวกรรม</div>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<!-- Main -->
+<main class="main">
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="topbar-title">ภาพรวมระบบน้ำ</div>
+      <div class="topbar-sub">อัปเดตล่าสุด: วันนี้ 08:30 น.</div>
+    </div>
+    <div class="topbar-right">
+      <div class="date-badge">
+        <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        พฤศจิกายน 2567 · สัปดาห์ที่ 44
+      </div>
+      <button class="btn-add">
+        <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        บันทึกข้อมูลวันนี้
+      </button>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- KPI Cards -->
+    <div class="kpi-grid">
+      <div class="kpi-card kpi-blue">
+        <div class="kpi-icon ki-blue">
+          <svg viewBox="0 0 24 24"><path d="M12 2C6 8 4 11 4 14a8 8 0 0016 0c0-3-2-6-8-12z"/></svg>
+        </div>
+        <div class="kpi-label">น้ำใช้วันนี้</div>
+        <div class="kpi-value">4,820<span class="kpi-unit">m³</span></div>
+        <div class="kpi-delta delta-down">▼ 3.2% จากเมื่อวาน</div>
+      </div>
+      <div class="kpi-card kpi-teal">
+        <div class="kpi-icon ki-teal">
+          <svg viewBox="0 0 24 24"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+        </div>
+        <div class="kpi-label">ประสิทธิภาพน้ำ</div>
+        <div class="kpi-value">2.41<span class="kpi-unit">m³/TC</span></div>
+        <div class="kpi-delta delta-up">▲ ดีกว่าเป้า 2.60</div>
+      </div>
+      <div class="kpi-card kpi-amber">
+        <div class="kpi-icon ki-amber">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+        </div>
+        <div class="kpi-label">BOD น้ำทิ้งล่าสุด</div>
+        <div class="kpi-value">16.4<span class="kpi-unit">mg/L</span></div>
+        <div class="kpi-delta delta-neutral">● ผ่านมาตรฐาน (&lt;20)</div>
+      </div>
+      <div class="kpi-card kpi-red">
+        <div class="kpi-icon ki-red">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        </div>
+        <div class="kpi-label">การแจ้งเตือน</div>
+        <div class="kpi-value">3<span class="kpi-unit">รายการ</span></div>
+        <div class="kpi-delta delta-down">● 1 รายการยังไม่แก้ไข</div>
+      </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="charts-row">
+      <div class="chart-card">
+        <div class="chart-header">
+          <div>
+            <div class="chart-title">ปริมาณการใช้น้ำ 30 วัน</div>
+            <div class="chart-sub">Process water + น้ำรวม (m³/วัน)</div>
+          </div>
+          <div class="chart-legend">
+            <div class="legend-item"><div class="legend-dot" style="background:#2980d4"></div>ปริมาณน้ำ</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#0f9e75"></div>เป้าหมาย</div>
+          </div>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="usageChart"></canvas>
+        </div>
+      </div>
+
+      <div class="standard-card">
+        <div class="chart-header" style="margin-bottom:12px;">
+          <div>
+            <div class="chart-title">สถานะน้ำทิ้งวันนี้</div>
+            <div class="chart-sub">เปรียบเทียบกับมาตรฐาน กรอ.</div>
+          </div>
+        </div>
+        <div class="param-list">
+          <div class="param-item">
+            <div class="param-header">
+              <span class="param-name">BOD</span>
+              <span class="param-status status-ok">ผ่าน</span>
+            </div>
+            <div class="param-bar-bg"><div class="param-bar bar-ok" style="width:82%"></div></div>
+            <div class="param-vals">
+              <span class="param-actual">16.4 mg/L</span>
+              <span class="param-limit">มาตรฐาน ≤ 20</span>
+            </div>
+          </div>
+          <div class="param-item">
+            <div class="param-header">
+              <span class="param-name">COD</span>
+              <span class="param-status status-ok">ผ่าน</span>
+            </div>
+            <div class="param-bar-bg"><div class="param-bar bar-ok" style="width:73%"></div></div>
+            <div class="param-vals">
+              <span class="param-actual">87.6 mg/L</span>
+              <span class="param-limit">มาตรฐาน ≤ 120</span>
+            </div>
+          </div>
+          <div class="param-item">
+            <div class="param-header">
+              <span class="param-name">pH</span>
+              <span class="param-status status-ok">ผ่าน</span>
+            </div>
+            <div class="param-bar-bg"><div class="param-bar bar-ok" style="width:63%"></div></div>
+            <div class="param-vals">
+              <span class="param-actual">7.2</span>
+              <span class="param-limit">มาตรฐาน 5.5–9.0</span>
+            </div>
+          </div>
+          <div class="param-item">
+            <div class="param-header">
+              <span class="param-name">TSS</span>
+              <span class="param-status status-warn">เฝ้าระวัง</span>
+            </div>
+            <div class="param-bar-bg"><div class="param-bar bar-warn" style="width:88%"></div></div>
+            <div class="param-vals">
+              <span class="param-actual">44.2 mg/L</span>
+              <span class="param-limit">มาตรฐาน ≤ 50</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Row -->
+    <div class="bottom-row">
+
+      <!-- Recent entries table -->
+      <div class="table-card">
+        <div class="table-header">
+          <div class="table-title">บันทึกการใช้น้ำล่าสุด</div>
+          <button class="btn-link">ดูทั้งหมด →</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>วันที่</th>
+              <th>จุดวัด</th>
+              <th>ปริมาณ (m³)</th>
+              <th>m³/TC</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="mono">25/11/67</td>
+              <td>ล้างอ้อย</td>
+              <td class="mono">1,240</td>
+              <td class="mono">0.62</td>
+            </tr>
+            <tr>
+              <td class="mono">25/11/67</td>
+              <td>หม้อต้ม</td>
+              <td class="mono">890</td>
+              <td class="mono">0.44</td>
+            </tr>
+            <tr>
+              <td class="mono">25/11/67</td>
+              <td>Extraction</td>
+              <td class="mono">2,690</td>
+              <td class="mono">1.35</td>
+            </tr>
+            <tr>
+              <td class="mono">24/11/67</td>
+              <td>รวมทั้งหมด</td>
+              <td class="mono">4,980</td>
+              <td class="mono">2.49</td>
+            </tr>
+            <tr>
+              <td class="mono">23/11/67</td>
+              <td>รวมทั้งหมด</td>
+              <td class="mono">5,120</td>
+              <td class="mono">2.56</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Alerts -->
+      <div class="table-card">
+        <div class="table-header">
+          <div class="table-title">การแจ้งเตือนล่าสุด</div>
+          <button class="btn-link">ดูทั้งหมด →</button>
+        </div>
+        <div class="alert-row">
+          <div class="alert-item">
+            <div class="alert-dot-wrap"><div class="alert-dot ad-red"></div></div>
+            <div class="alert-content">
+              <div class="alert-title">TSS เกินค่ามาตรฐาน</div>
+              <div class="alert-meta">Effluent · 22/11/67 09:15 น. · ค่า 54.3 mg/L (เกิน 50)</div>
+            </div>
+            <span class="alert-badge ab-red">ยังไม่แก้</span>
+          </div>
+          <div class="alert-item">
+            <div class="alert-dot-wrap"><div class="alert-dot ad-amber"></div></div>
+            <div class="alert-content">
+              <div class="alert-title">TSS เข้าใกล้ค่ามาตรฐาน</div>
+              <div class="alert-meta">Effluent · 25/11/67 08:30 น. · ค่า 44.2 mg/L</div>
+            </div>
+            <span class="alert-badge ab-amber">เฝ้าระวัง</span>
+          </div>
+          <div class="alert-item">
+            <div class="alert-dot-wrap"><div class="alert-dot ad-amber"></div></div>
+            <div class="alert-content">
+              <div class="alert-title">ข้อมูลขาดหาย</div>
+              <div class="alert-meta">บ่อบำบัด #2 · 24/11/67 · ไม่มีการบันทึก</div>
+            </div>
+            <span class="alert-badge ab-amber">ข้อมูล</span>
+          </div>
+          <div class="alert-item">
+            <div class="alert-dot-wrap"><div class="alert-dot" style="background:var(--teal-500)"></div></div>
+            <div class="alert-content">
+              <div class="alert-title">COD กลับสู่ปกติ</div>
+              <div class="alert-meta">Effluent · 23/11/67 · แก้ไขแล้ว</div>
+            </div>
+            <span class="alert-badge ab-ok">แก้ไขแล้ว</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</main>
+
+<script>
+const labels = Array.from({length:30}, (_,i) => {
+  const d = new Date(2024,10,25);
+  d.setDate(d.getDate() - (29-i));
+  return (d.getDate())+'/11';
+}).map((v,i) => i % 5 === 0 ? v : '');
+
+const fullLabels = Array.from({length:30}, (_,i) => {
+  const d = new Date(2024,10,25);
+  d.setDate(d.getDate() - (29-i));
+  return d.getDate()+'/11/67';
+});
+
+const usage = Array.from({length:30}, () => Math.round(4400 + Math.random()*900));
+const target = Array(30).fill(5200);
+
+const ctx = document.getElementById('usageChart').getContext('2d');
+new Chart(ctx, {
+  type: 'bar',
+  data: {
+    labels: fullLabels,
+    datasets: [
+      {
+        label: 'ปริมาณน้ำ (m³)',
+        data: usage,
+        backgroundColor: 'rgba(41,128,212,0.75)',
+        borderRadius: 3,
+        borderSkipped: false,
+        order: 2
+      },
+      {
+        label: 'เป้าหมาย',
+        data: target,
+        type: 'line',
+        borderColor: '#0f9e75',
+        borderWidth: 1.5,
+        borderDash: [4,3],
+        pointRadius: 0,
+        fill: false,
+        order: 1
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          title: (items) => fullLabels[items[0].dataIndex],
+          label: (item) => item.dataset.label + ': ' + item.raw.toLocaleString() + ' m³'
+        }
+      }
+    },
+    scales: {
+      x: {
+        ticks: { font: { size: 10 }, color: '#6b748a', maxRotation: 0 },
+        grid: { display: false }
+      },
+      y: {
+        ticks: { font: { size: 10 }, color: '#6b748a', callback: v => (v/1000).toFixed(1)+'k' },
+        grid: { color: 'rgba(0,0,0,0.04)' },
+        border: { display: false }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
