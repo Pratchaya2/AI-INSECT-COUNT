@@ -7,7 +7,7 @@ names: ['fly', 'test']
 
 roboflow:
   workspace: aiinsect
-  project: aiinsect
+  project: ai-insect
   version: dataset
-  license: Private
-  url: https://app.roboflow.com/aiinsect/aiinsect/dataset
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/aiinsect/ai-insect/dataset/dataset

@@ -334,16 +334,20 @@ st.markdown("""
 # ─────────────────────────────────────────
 #  MODEL LOAD
 # ─────────────────────────────────────────
+# โมเดลที่เลือกได้ใน UI: ชื่อแสดงผล → ไฟล์ weights
+MODELS = {
+    "ใหม่ (insect_train_v5)": "runs_detect_runs_insect_train_v5_weights_best.pt",
+    "เดิม (train-4)": "runs_detect_train-4_weights_best.pt",
+}
+
 @st.cache_resource
-def load_insect_model():
+def load_insect_model(weights_path):
+    """โหลดโมเดลตาม path — cache แยกตามไฟล์ สลับโมเดลแล้วโหลดจาก cache ทันที"""
     try:
-        model = YOLO("runs_detect_train-4_weights_best.pt")
-        return model
+        return YOLO(weights_path)
     except Exception as e:
         st.error(f"❌ ไม่สามารถเชื่อมต่อ AI ได้: {e}")
         return None
-
-model = load_insect_model()
 
 # ─────────────────────────────────────────
 #  SESSION STATE
@@ -353,6 +357,7 @@ keys_to_init = {
     'inspection_date': datetime.now(timezone(timedelta(hours=7))).date(),
     'excel_data_to_download': None, 'excel_filename': "",
     'confidence_threshold': 0.4,
+    'model_choice': list(MODELS.keys())[0],
 }
 for key, value in keys_to_init.items():
     if key not in st.session_state:
@@ -398,6 +403,16 @@ col_left, col_right = st.columns([1, 1.4], gap="large")
 #  LEFT — INPUT
 # ══════════════════════════════════════════
 with col_left:
+
+    # ── Section 0: Model selector ──
+    st.markdown('<div class="section-title">🤖 เลือกโมเดล AI</div>', unsafe_allow_html=True)
+    st.selectbox(
+        "โมเดลที่ใช้วิเคราะห์",
+        list(MODELS.keys()),
+        key='model_choice',
+        label_visibility="collapsed",
+    )
+    model = load_insect_model(MODELS[st.session_state.model_choice])
 
     # ── Section 1: Location info ──
     st.markdown('<div class="section-title">📋 ข้อมูลการตรวจ</div>', unsafe_allow_html=True)

@@ -1,5 +1,12 @@
 .streamlit/secrets.toml
 
+# OS / editor / agent junk
+.DS_Store
+.claude/
+
+# Local build artifacts (dataset zip for Studio upload)
+ai-insect-dataset.zip
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

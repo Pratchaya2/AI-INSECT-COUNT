@@ -1,8 +1,8 @@
 
-AI-Insect - vdataset aiinsect
+AI-Insect - vdataset ai-insect
 ==============================
 
-This dataset was exported via roboflow.com on March 27, 2026 at 7:34 AM GMT
+This dataset was exported via roboflow.com on June 13, 2026 at 3:24 AM GMT
 
 Roboflow is an end-to-end computer vision platform that helps you
 * collaborate with your team on computer vision projects
@@ -17,7 +17,7 @@ visit https://github.com/roboflow/notebooks
 
 To find over 100k other datasets and pre-trained models, visit https://universe.roboflow.com
 
-The dataset includes 81 images.
+The dataset includes 120 images.
 Insect are annotated in YOLOv8 format.
 
 No pre-processing or augmentation was applied.
