@@ -1,0 +1,8 @@
+[theme]
+# แอปออกแบบ CSS มาสำหรับธีมสว่าง (การ์ดขาว ตัวอักษรเข้ม) — บังคับ light
+# เพื่อไม่ให้ธีมมืดของเบราว์เซอร์/ระบบทำให้ตัวอักษรกลืนกับพื้นหลัง
+base = "light"
+backgroundColor = "#f4f7f4"
+secondaryBackgroundColor = "#ffffff"
+textColor = "#1a2e1a"
+primaryColor = "#2ecc71"

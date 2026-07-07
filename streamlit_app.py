@@ -336,7 +336,8 @@ st.markdown("""
 # ─────────────────────────────────────────
 # โมเดลที่เลือกได้ใน UI: ชื่อแสดงผล → ไฟล์ weights
 MODELS = {
-    "ใหม่ (insect_train_v5)": "runs_detect_runs_insect_train_v5_weights_best.pt",
+    "ใหม่ล่าสุด (insect_train_v5-2)": "runs_detect_runs_insect_train_v5-2_weights_best.pt",
+    "insect_train_v5": "runs_detect_runs_insect_train_v5_weights_best.pt",
     "เดิม (train-4)": "runs_detect_train-4_weights_best.pt",
 }
 
@@ -358,6 +359,7 @@ keys_to_init = {
     'excel_data_to_download': None, 'excel_filename': "",
     'confidence_threshold': 0.4,
     'model_choice': list(MODELS.keys())[0],
+    'machine_status': "ปกติ",
 }
 for key, value in keys_to_init.items():
     if key not in st.session_state:
@@ -443,6 +445,13 @@ with col_left:
     st.selectbox("📍 พื้นที่ติดตั้ง", location_list, key='location', disabled=loc_disabled)
 
     st.date_input("📅 วันที่ตรวจ", key='inspection_date')
+
+    st.radio(
+        "🔧 ตรวจสอบสภาพเครื่องและหลอดไฟดักแมลง",
+        ["ปกติ", "ผิดปกติ"],
+        key='machine_status',
+        horizontal=True,
+    )
 
     st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
@@ -647,12 +656,18 @@ with col_right:
                         Image.fromarray(annotated_rgb).save(img_buf, format="JPEG")
                         img_base64 = base64.b64encode(img_buf.getvalue()).decode("utf-8")
 
+                        # รูปต้นฉบับ (ยังไม่ตีกรอบ) สำหรับเก็บใน Back up (No Label)
+                        orig_buf    = io.BytesIO()
+                        image_pil.save(orig_buf, format="JPEG")
+                        orig_base64 = base64.b64encode(orig_buf.getvalue()).decode("utf-8")
+
                         new_record = {
                             "วันที่ตรวจ":          st.session_state.inspection_date.strftime("%Y-%m-%d"),
                             "เวลาที่บันทึก":        time_in_bkk.strftime("%H:%M:%S"),
                             "โรงงาน":              st.session_state.factory,
                             "หน่วยงาน/แผนก":       st.session_state.department,
                             "พื้นที่ติดตั้ง":       st.session_state.location,
+                            "ตรวจสอบสภาพเครื่องและหลอดไฟดักแมลง": st.session_state.machine_status,
                             "จำนวนแมลงทั้งหมด":    total,
                             "จำนวนแมลงวัน":        fly_count,
                             "จำนวนแมลงอื่นๆ":      other_count,
@@ -663,7 +678,9 @@ with col_right:
 
                         # Power Automate
                         urlPost  = "https://default097b580bb474487c888346e0bb1b5c.11.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/49eae18339ec46cd97ca8069832d0f34/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=Ei6KSW6Dt9UVgb5ZYNxh6PLtkX7dxQuOF5LAsdgVFnw"
-                        requests.post(urlPost, json=new_record)
+                        # ส่งรูปต้นฉบับเพิ่มเฉพาะตอน POST (ไม่เก็บลง Excel เพื่อไม่ให้ไฟล์บวม)
+                        webhook_payload = {**new_record, "รูปภาพต้นฉบับ": orig_base64}
+                        requests.post(urlPost, json=webhook_payload)
 
                         # Excel
                         df_new = pd.DataFrame([new_record])

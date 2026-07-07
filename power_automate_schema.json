@@ -1,0 +1,67 @@
+{
+  "trigger_request_schema": {
+    "type": "object",
+    "properties": {
+      "วันที่ตรวจ": { "type": "string" },
+      "เวลาที่บันทึก": { "type": "string" },
+      "โรงงาน": { "type": "string" },
+      "หน่วยงาน/แผนก": { "type": "string" },
+      "พื้นที่ติดตั้ง": { "type": "string" },
+      "ตรวจสอบสภาพเครื่องและหลอดไฟดักแมลง": { "type": "string" },
+      "จำนวนแมลงทั้งหมด": { "type": "integer" },
+      "จำนวนแมลงวัน": { "type": "integer" },
+      "จำนวนแมลงอื่นๆ": { "type": "integer" },
+      "ผู้บันทึก": { "type": "string" },
+      "หมายเหตุ": { "type": "string" },
+      "รูปภาพ": { "type": "string" },
+      "รูปภาพต้นฉบับ": { "type": "string" }
+    }
+  },
+
+  "sample_payload": {
+    "วันที่ตรวจ": "2026-07-07",
+    "เวลาที่บันทึก": "14:30:15",
+    "โรงงาน": "MDC",
+    "หน่วยงาน/แผนก": "บรรจุ",
+    "พื้นที่ติดตั้ง": "เครื่องที่ 1",
+    "ตรวจสอบสภาพเครื่องและหลอดไฟดักแมลง": "ปกติ",
+    "จำนวนแมลงทั้งหมด": 42,
+    "จำนวนแมลงวัน": 30,
+    "จำนวนแมลงอื่นๆ": 12,
+    "ผู้บันทึก": "สมชาย ใจดี",
+    "หมายเหตุ": "",
+    "รูปภาพ": "/9j/4AAQSkZJRgABAQAAAQABAAD... (base64 ของรูปที่ตีกรอบแล้ว)",
+    "รูปภาพต้นฉบับ": "/9j/4AAQSkZJRgABAQAAAQABAAD... (base64 ของรูปต้นฉบับ ยังไม่ตีกรอบ)"
+  },
+
+  "sharepoint_create_item": {
+    "_comment": "Action: SharePoint > Create item. Map ค่าลง column ของ List. column choice 'ตรวจสอบสภาพเครื่องและหลอดไฟดักแมลง' ใส่ค่า string 'ปกติ'/'ผิดปกติ' ได้ตรง ๆ",
+    "วันที่ตรวจ": "@{triggerBody()?['วันที่ตรวจ']}",
+    "เวลาที่บันทึก": "@{triggerBody()?['เวลาที่บันทึก']}",
+    "โรงงาน": "@{triggerBody()?['โรงงาน']}",
+    "หน่วยงาน/แผนก": "@{triggerBody()?['หน่วยงาน/แผนก']}",
+    "พื้นที่ติดตั้ง": "@{triggerBody()?['พื้นที่ติดตั้ง']}",
+    "ตรวจสอบสภาพเครื่องและหลอดไฟดักแมลง": "@{triggerBody()?['ตรวจสอบสภาพเครื่องและหลอดไฟดักแมลง']}",
+    "จำนวนแมลงทั้งหมด": "@{triggerBody()?['จำนวนแมลงทั้งหมด']}",
+    "จำนวนแมลงวัน": "@{triggerBody()?['จำนวนแมลงวัน']}",
+    "จำนวนแมลงอื่นๆ": "@{triggerBody()?['จำนวนแมลงอื่นๆ']}",
+    "ผู้บันทึก": "@{triggerBody()?['ผู้บันทึก']}",
+    "หมายเหตุ": "@{triggerBody()?['หมายเหตุ']}"
+  },
+
+  "sharepoint_backup_nolabel_file": {
+    "_comment": "Action: SharePoint > Create file. เก็บรูปต้นฉบับ (ยังไม่ตีกรอบ) ลง Folder 'Back up (No Label)'",
+    "Site Address": "<ใส่ URL ของ SharePoint site>",
+    "Folder Path": "/Shared Documents/Back up (No Label)",
+    "File Name": "@{triggerBody()?['โรงงาน']}_@{triggerBody()?['พื้นที่ติดตั้ง']}_@{triggerBody()?['วันที่ตรวจ']}_@{triggerBody()?['เวลาที่บันทึก']}.jpg",
+    "File Content": "@{base64ToBinary(triggerBody()?['รูปภาพต้นฉบับ'])}"
+  },
+
+  "_notes": [
+    "1) วาง 'trigger_request_schema' ในช่อง Request Body JSON Schema ของ trigger 'When a HTTP request is received' หรือกด 'Use sample payload to generate schema' แล้ววาง 'sample_payload'",
+    "2) แก้ค่า placeholder: <ใส่ URL ของ SharePoint site> และ 'Folder Path' / ชื่อ document library ให้ตรงกับของจริง",
+    "3) column 'ตรวจสอบสภาพเครื่องและหลอดไฟดักแมลง' เป็น type Choice — ค่าที่ส่งมาคือ 'ปกติ' หรือ 'ผิดปกติ' ซึ่งต้องตรงกับ choice ที่ตั้งไว้ใน SharePoint",
+    "4) รูปภาพต้นฉบับถูกส่งเฉพาะทาง webhook (ไม่ได้เก็บใน Excel) — ใช้สำหรับ backup รูปที่ยังไม่ตีกรอบเท่านั้น",
+    "5) หากต้องเก็บรูปที่ตีกรอบแล้วด้วย ให้เพิ่ม action Create file อีกตัวโดยใช้ base64ToBinary(triggerBody()?['รูปภาพ'])"
+  ]
+}
