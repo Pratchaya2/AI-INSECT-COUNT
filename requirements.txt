@@ -1,9 +1,10 @@
-streamlit
-opencv-python-headless
+streamlit==1.55.0
+opencv-python-headless==4.10.0.84
+./vendor/opencv-python-stub
 Pillow
 numpy
 pandas
 xlsxwriter
 openpyxl
-ultralytics
+ultralytics==8.4.41
 requests
