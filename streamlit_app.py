@@ -40,6 +40,13 @@ LOCATION_DATA = {
     }
 }
 EXCEL_FILENAME = "insect_analysis_history.xlsx"
+WEBHOOK_TIMEOUT = 30      # วินาที
+
+
+def encode_jpeg_base64(img: Image.Image) -> str:
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG")
+    return base64.b64encode(buf.getvalue()).decode("utf-8")
 
 # ─────────────────────────────────────────
 #  PAGE CONFIG
@@ -362,6 +369,7 @@ keys_to_init = {
     'confidence_threshold': 0.4,
     'model_choice': list(MODELS.keys())[0],
     'machine_status': "ปกติ",
+    'is_saving': False, 'record_saved': False,
 }
 for key, value in keys_to_init.items():
     if key not in st.session_state:
@@ -484,6 +492,7 @@ with col_left:
     if analysis_button:
         st.session_state.analysis_results = None
         st.session_state.excel_data_to_download = None
+        st.session_state.record_saved = False
 
         f = st.session_state.factory
         d = st.session_state.department
@@ -637,31 +646,43 @@ with col_right:
         # ── Save form ──
         st.markdown('<div class="section-title">💾 บันทึกและดาวน์โหลดผล</div>', unsafe_allow_html=True)
 
+        # callback ทำงานก่อน rerun → ปุ่มถูก render เป็น disabled ทันทีระหว่างบันทึก
+        def request_save():
+            ss = st.session_state
+            if ss.get("recorder_name", "").strip() and not ss.is_saving and not ss.record_saved:
+                ss.is_saving = True
+
         with st.form("save_form"):
             c1, c2 = st.columns(2)
             with c1:
-                recorder_name = st.text_input("👤 ชื่อผู้บันทึก", placeholder="กรอกชื่อ-สกุล")
+                recorder_name = st.text_input("👤 ชื่อผู้บันทึก", placeholder="กรอกชื่อ-สกุล", key="recorder_name")
             with c2:
                 st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
-                save_btn = st.form_submit_button("💾  บันทึกข้อมูล", use_container_width=True)
+                if st.session_state.is_saving:
+                    btn_label = "⏳  กำลังบันทึก..."
+                elif st.session_state.record_saved:
+                    btn_label = "✅  บันทึกแล้ว"
+                else:
+                    btn_label = "💾  บันทึกข้อมูล"
+                save_btn = st.form_submit_button(
+                    btn_label, use_container_width=True, on_click=request_save,
+                    disabled=st.session_state.is_saving or st.session_state.record_saved,
+                )
             notes = st.text_area("📝 หมายเหตุ (ถ้ามี)", placeholder="เพิ่มเติมหมายเหตุที่นี่...", height=80)
 
-            if save_btn:
-                if not recorder_name.strip():
-                    st.warning("⚠️ กรุณากรอกชื่อผู้บันทึก")
-                else:
-                    try:
+            if save_btn and not recorder_name.strip():
+                st.warning("⚠️ กรุณากรอกชื่อผู้บันทึก")
+
+            if st.session_state.is_saving and not st.session_state.record_saved:
+                save_ok = False
+                try:
+                    with st.spinner("💾 กำลังบันทึกข้อมูล... กรุณารอสักครู่ (ไม่ต้องกดซ้ำ)"):
                         bkk_tz      = timezone(timedelta(hours=7))
                         time_in_bkk = datetime.now(bkk_tz)
 
-                        img_buf    = io.BytesIO()
-                        Image.fromarray(annotated_rgb).save(img_buf, format="JPEG")
-                        img_base64 = base64.b64encode(img_buf.getvalue()).decode("utf-8")
-
+                        img_base64 = encode_jpeg_base64(Image.fromarray(annotated_rgb))
                         # รูปต้นฉบับ (ยังไม่ตีกรอบ) สำหรับเก็บใน Back up (No Label)
-                        orig_buf    = io.BytesIO()
-                        image_pil.save(orig_buf, format="JPEG")
-                        orig_base64 = base64.b64encode(orig_buf.getvalue()).decode("utf-8")
+                        orig_base64 = encode_jpeg_base64(image_pil)
 
                         new_record = {
                             "วันที่ตรวจ":          st.session_state.inspection_date.strftime("%Y-%m-%d"),
@@ -682,7 +703,10 @@ with col_right:
                         urlPost  = "https://default097b580bb474487c888346e0bb1b5c.11.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/49eae18339ec46cd97ca8069832d0f34/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=Ei6KSW6Dt9UVgb5ZYNxh6PLtkX7dxQuOF5LAsdgVFnw"
                         # ส่งรูปต้นฉบับเพิ่มเฉพาะตอน POST (ไม่เก็บลง Excel เพื่อไม่ให้ไฟล์บวม)
                         webhook_payload = {**new_record, "รูปภาพต้นฉบับ": orig_base64}
-                        requests.post(urlPost, json=webhook_payload)
+                        resp = requests.post(urlPost, json=webhook_payload, timeout=WEBHOOK_TIMEOUT)
+                        resp.raise_for_status()
+                        # ส่งสำเร็จแล้ว → ล็อกทันที กันส่งซ้ำแม้ขั้นตอนถัดไปจะถูกขัดจังหวะ
+                        st.session_state.record_saved = True
 
                         # Excel
                         df_new = pd.DataFrame([new_record])
@@ -691,18 +715,27 @@ with col_right:
                             df_combined = pd.concat([df_existing, df_new], ignore_index=True)
                         else:
                             df_combined = df_new
-                        df_combined.to_excel(EXCEL_FILENAME, index=False)
 
                         output = io.BytesIO()
                         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
                             df_combined.to_excel(writer, index=False, sheet_name='AnalysisHistory')
+                        excel_bytes = output.getvalue()
+                        with open(EXCEL_FILENAME, "wb") as fh:
+                            fh.write(excel_bytes)
 
-                        st.session_state.excel_data_to_download = output.getvalue()
+                        st.session_state.excel_data_to_download = excel_bytes
                         st.session_state.excel_filename         = EXCEL_FILENAME
-                        st.rerun()
+                        save_ok = True
 
-                    except Exception as e:
-                        st.error(f"❌ เกิดข้อผิดพลาดในการบันทึก: {e}")
+                except requests.exceptions.Timeout:
+                    st.error("❌ ระบบปลายทางตอบสนองช้าเกินไป กรุณาลองบันทึกอีกครั้ง")
+                except Exception as e:
+                    st.error(f"❌ เกิดข้อผิดพลาดในการบันทึก: {e}")
+                finally:
+                    st.session_state.is_saving = False
+
+                if save_ok:
+                    st.rerun()
 
         # ── Download button ──
         if st.session_state.get("excel_data_to_download"):
